@@ -20,7 +20,7 @@ import streamlit as st
 from query import get_answer
 
 st.set_page_config(page_title="NYC Zoning Q&A", layout="centered")
-st.title("Ask the Zoning Handbook (2018)")
+st.title("NYC-Zoning GPT")
 
 q = st.text_input(
     "Your question",
