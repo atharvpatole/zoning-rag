@@ -129,42 +129,57 @@ def load_my_index():
 
 
 def get_answer(question: str) -> str:
-    """Retrieve relevant context via LlamaIndex and answer using Groq chat API."""
     index = load_my_index()
 
-    # Use LlamaIndex retriever to get top-k relevant chunks
     retriever = index.as_retriever(similarity_top_k=TOP_K)
     nodes = retriever.retrieve(question)
 
     if not nodes:
-        return "I couldn't find relevant information in the handbook for that question."
+        return "I couldn't find relevant information in the documents for that question."
 
     # Build context from retrieved nodes
     context_parts = []
     for n in nodes:
-        text = n.node.get_content() if hasattr(n.node, "get_content") else n.node.text
-        page = n.node.metadata.get("page", "N/A")
-        context_parts.append(f"[Page {page}] {text.strip()}")
+        node = n.node
+        text = node.get_content() if hasattr(node, "get_content") else node.text
+        doc = node.metadata.get("file_name", node.metadata.get("filename", "Unknown document"))
+        page = node.metadata.get("page", "N/A")
+        context_parts.append(f"[{doc}, page {page}] {text.strip()}")
 
     context = "\n\n".join(context_parts)
 
-    # Compose the prompt for the model
+    # 🔹 Compose the prompt for the model
     user_prompt = (
-        "You are an assistant answering questions about the NYC Zoning Handbook (2018).\n"
-        "Use ONLY the context provided. If the answer is not clearly in the context, say "
-        "'I don't know based on the handbook context.'\n\n"
+        "You are an assistant answering questions about NYC zoning and land use.\n"
+        "You are given excerpts from several official PDFs, including:\n"
+        "- Zoning Resolution (full text)\n"
+        "- Zoning Handbook 2018\n"
+        "- Zoning FAQ\n"
+        "- Zoning Glossary\n\n"
+        "Use ONLY the information in the CONTEXT below. Do NOT use outside knowledge.\n"
+        "If the answer is not clearly supported by the context, reply exactly with:\n"
+        "\"I don't know based on the provided documents.\"\n\n"
+        "When answering:\n"
+        "- Combine relevant information from all documents.\n"
+        "- Prefer specific, concrete rules over vague descriptions.\n"
+        "- If different documents disagree, say that they differ instead of guessing.\n"
+        "- Be concise: 3–6 sentences maximum.\n\n"
         f"CONTEXT:\n{context}\n\n"
         f"QUESTION: {question}\n\n"
-        "Answer clearly and concisely."
+        "Now answer the question clearly and precisely based only on the context above."
     )
 
-    # Call Groq using OpenAI-compatible chat endpoint
+    # 🔹 Call Groq using OpenAI-compatible chat endpoint
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
             {
                 "role": "system",
-                "content": "You are a helpful assistant specializing in NYC zoning law based on the 2018 Zoning Handbook.",
+                "content": (
+                    "You are a careful legal-style assistant that answers questions about NYC zoning "
+                    "using only the provided excerpts from multiple official PDFs. "
+                    "If the context is insufficient, you say you don't know."
+                ),
             },
             {
                 "role": "user",
@@ -175,6 +190,7 @@ def get_answer(question: str) -> str:
     )
 
     return response.choices[0].message.content
+
 
 
 if __name__ == "__main__":

@@ -26,4 +26,4 @@ EMBED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 GROQ_MODEL_NAME = "llama3-8b-8192"
 
 # how many chunks to retrieve per query
-TOP_K = 4
+TOP_K = 10
