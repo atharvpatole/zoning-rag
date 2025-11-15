@@ -148,46 +148,52 @@ def get_answer(question: str) -> str:
 
     context = "\n\n".join(context_parts)
 
+
     # 🔹 Compose the prompt for the model
     user_prompt = (
-        "You are an assistant answering questions about NYC zoning and land use.\n"
-        "You are given excerpts from several official PDFs, including:\n"
-        "- Zoning Resolution (full text)\n"
-        "- Zoning Handbook 2018\n"
-        "- Zoning FAQ\n"
-        "- Zoning Glossary\n\n"
-        "Use ONLY the information in the CONTEXT below. Do NOT use outside knowledge.\n"
-        "If the answer is not clearly supported by the context, reply exactly with:\n"
-        "\"I don't know based on the provided documents.\"\n\n"
-        "When answering:\n"
-        "- Combine relevant information from all documents.\n"
-        "- Prefer specific, concrete rules over vague descriptions.\n"
-        "- If different documents disagree, say that they differ instead of guessing.\n"
-        "- Be concise: 3–6 sentences maximum.\n\n"
-        f"CONTEXT:\n{context}\n\n"
-        f"QUESTION: {question}\n\n"
-        "Now answer the question clearly and precisely based only on the context above."
+    "You are an assistant that answers questions about NYC zoning and land use.\n"
+    "You have access to internal reference material from several official zoning documents. "
+    "Use this material to answer the question, but DO NOT mention the words 'context', "
+    "'documents', 'PDF', 'pages', or 'examples'.\n\n"
+    "Answer as if you are a knowledgeable zoning expert talking directly to the user.\n"
+    "Guidelines for your answer:\n"
+    "- Give a clear, direct answer in plain language.\n"
+    "- Do NOT say things like 'according to the provided context' or 'in the documents above'.\n"
+    "- Do NOT mention page numbers or file names.\n"
+    "- If the information you have is incomplete or the question is too broad "
+    "  (for example: 'where can I build commercial buildings' for the whole city), "
+    "  say that more detail is needed and ask the user a clarifying question.\n"
+    "- If the reference material truly does not contain the answer, say: "
+    "  'I don’t have enough information from the zoning material to answer that specifically.'\n\n"
+    "INTERNAL REFERENCE MATERIAL (do not refer to this explicitly in your answer):\n"
+    f"{context}\n\n"
+    f"USER QUESTION: {question}\n\n"
+    "Now respond with a helpful, concise answer for the user, following the guidelines above."
     )
+
 
     # 🔹 Call Groq using OpenAI-compatible chat endpoint
     response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a careful legal-style assistant that answers questions about NYC zoning "
-                    "using only the provided excerpts from multiple official PDFs. "
-                    "If the context is insufficient, you say you don't know."
-                ),
-            },
-            {
-                "role": "user",
-                "content": user_prompt,
-            },
-        ],
-        temperature=0.2,
+    model="llama-3.1-8b-instant",
+    messages=[
+        {
+            "role": "system",
+            "content": (
+                "You are a helpful NYC zoning assistant. "
+                "You answer like a zoning expert, in clear language, without mentioning any PDFs, "
+                "documents, pages, or internal context. "
+                "If the question is too broad or the zoning rules vary a lot, "
+                "you ask the user politely for more specific details."
+            ),
+        },
+        {
+            "role": "user",
+            "content": user_prompt,
+        },
+    ],
+    temperature=0.2,
     )
+
 
     return response.choices[0].message.content
 
