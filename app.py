@@ -1,18 +1,16 @@
 # app.py
 import streamlit as st
 from datetime import datetime
-import html
 
 from query import get_answer
 
 
-# ---------- Helpers ----------
+# Helper functions
 def normalize_timestamp(ts):
     """Return a datetime for any timestamp value (str/datetime/None)."""
     if isinstance(ts, datetime):
         return ts
     if isinstance(ts, str):
-        # Adjust this format if you store timestamps differently
         try:
             return datetime.fromisoformat(ts)
         except ValueError:
@@ -24,125 +22,19 @@ def last_message_timestamp(messages):
     """Safely get the last message timestamp from a chat."""
     if not messages:
         return datetime.min
-    # use last element; fall back if 'timestamp' is missing
     ts = messages[-1].get("timestamp") if isinstance(messages[-1], dict) else None
     return normalize_timestamp(ts)
 
 
-# ---------- Page config ----------
+# Page configuration
 st.set_page_config(
     page_title="NYC Zoning Assistant",
     page_icon=None,
-    layout="wide",
+    layout="wide"
 )
 
-# ---------- Custom CSS ----------
-st.markdown(
-    """
-    <style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-
-    body { background-color: #f4f5f7; }
-
-    .app-header {
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid #e2e4e8;
-        background-color: #ffffff;
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-
-    .app-title {
-        font-size: 1.2rem;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-    }
-
-    .header-button > button {
-        border-radius: 999px;
-        padding: 0.35rem 0.9rem;
-        font-size: 0.85rem;
-    }
-
-    .sidebar-panel {
-        background-color: #ffffff;
-        border-right: 1px solid #e2e4e8;
-        height: calc(100vh - 56px);
-        padding: 0.75rem;
-        overflow-y: auto;
-    }
-
-    .sidebar-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-
-    .chat-list-item {
-        padding: 0.6rem 0.7rem;
-        border-radius: 6px;
-        border: 1px solid transparent;
-        font-size: 0.85rem;
-        margin-bottom: 0.3rem;
-        cursor: pointer;
-        background-color: #f7f8fa;
-    }
-
-    .chat-list-item.active {
-        border-color: #2563eb;
-        background-color: #eff3ff;
-        font-weight: 500;
-    }
-
-    .chat-list-item-title {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .chat-main {
-        height: calc(100vh - 56px);
-        padding: 0.75rem 1.5rem 0;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .chat-scroll {
-        flex: 1;
-        overflow-y: auto;
-        padding-bottom: 1rem;
-    }
-
-    .empty-state {
-        color: #7b7d82;
-        text-align: center;
-        margin-top: 4rem;
-    }
-
-    .empty-state h3 {
-        font-weight: 500;
-        margin-bottom: 0.5rem;
-    }
-
-    .empty-state ul {
-        margin-top: 0.75rem;
-        padding-left: 1.1rem;
-        text-align: left;
-        display: inline-block;
-        color: #9a9da3;
-        font-size: 0.9rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ---------- Session state ----------
+# Initialize session state
 if "chats" not in st.session_state:
-    # {chat_id: [{"role": "user"/"assistant", "content": str, "timestamp": iso_str}]}
     st.session_state.chats = {}
 
 if "current_chat_id" not in st.session_state:
@@ -151,36 +43,27 @@ if "current_chat_id" not in st.session_state:
 if "chat_counter" not in st.session_state:
     st.session_state.chat_counter = 0
 
-if "show_sidebar" not in st.session_state:
-    st.session_state.show_sidebar = True
+if "sidebar_visible" not in st.session_state:
+    st.session_state.sidebar_visible = True
 
+# Header with toggle button
+col1, col2, col3 = st.columns([1, 8, 1])
 
-# ---------- Header ----------
-with st.container():
-    col_menu, col_title, col_right = st.columns([1, 6, 2])
+with col1:
+    if st.button("Toggle Sidebar", key="toggle_sidebar"):
+        st.session_state.sidebar_visible = not st.session_state.sidebar_visible
+        st.rerun()
 
-    with col_menu:
-        st.markdown('<div class="app-header">', unsafe_allow_html=True)
-        if st.button("Sidebar", key="toggle_sidebar", help="Show or hide conversations"):
-            st.session_state.show_sidebar = not st.session_state.show_sidebar
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+with col2:
+    st.title("NYC Zoning Assistant")
 
-    with col_title:
-        st.markdown(
-            '<div class="app-header"><div class="app-title">NYC Zoning Assistant</div></div>',
-            unsafe_allow_html=True,
-        )
-
-    with col_right:
-        st.markdown('<div class="app-header header-button">', unsafe_allow_html=True)
-        if st.button("New chat", key="new_chat_btn"):
-            st.session_state.chat_counter += 1
-            new_id = f"chat_{st.session_state.chat_counter}"
-            st.session_state.chats[new_id] = []
-            st.session_state.current_chat_id = new_id
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+with col3:
+    if st.button("New Chat", key="new_chat_btn"):
+        st.session_state.chat_counter += 1
+        new_id = f"chat_{st.session_state.chat_counter}"
+        st.session_state.chats[new_id] = []
+        st.session_state.current_chat_id = new_id
+        st.rerun()
 
 # Ensure we always have a current chat
 if st.session_state.current_chat_id is None:
@@ -189,28 +72,26 @@ if st.session_state.current_chat_id is None:
     st.session_state.chats[first_id] = []
     st.session_state.current_chat_id = first_id
 
-# ---------- Layout: sidebar + main ----------
-if st.session_state.show_sidebar:
+# Layout: Sidebar and main area
+if st.session_state.sidebar_visible:
     sidebar_col, main_col = st.columns([3, 9])
 else:
     main_col = st.container()
     sidebar_col = None
 
-# ----- Sidebar: conversation list -----
+# Sidebar for conversation list
 if sidebar_col is not None:
     with sidebar_col:
-        st.markdown('<div class="sidebar-panel">', unsafe_allow_html=True)
-        st.markdown('<div class="sidebar-title">Conversations</div>', unsafe_allow_html=True)
-
+        st.header("Conversations")
+        
         chats = st.session_state.chats
         if chats:
-            # ✅ SAFE sort using normalized timestamps
             sorted_chats = sorted(
                 chats.items(),
                 key=lambda x: last_message_timestamp(x[1]),
                 reverse=True,
             )
-
+            
             for chat_id, messages in sorted_chats:
                 if messages:
                     first_user = next((m for m in messages if m.get("role") == "user"), None)
@@ -218,36 +99,49 @@ if sidebar_col is not None:
                         title_text = first_user["content"]
                     else:
                         title_text = "Untitled"
-                    if len(title_text) > 60:
-                        title = title_text[:60] + "..."
+                    if len(title_text) > 50:
+                        title = title_text[:50] + "..."
                     else:
                         title = title_text
                 else:
                     title = "New conversation"
-
+                
                 is_active = chat_id == st.session_state.current_chat_id
-                css_class = "chat-list-item active" if is_active else "chat-list-item"
-
-                with st.container():
-                    st.markdown(
-                        f'<div class="{css_class}"><div class="chat-list-item-title">{html.escape(title)}</div></div>',
-                        unsafe_allow_html=True,
-                    )
-                    if st.button("Open", key=f"open_{chat_id}", use_container_width=True):
-                        st.session_state.current_chat_id = chat_id
-                        st.rerun()
+                button_label = title
+                
+                if st.button(button_label, key=f"chat_{chat_id}", use_container_width=True):
+                    st.session_state.current_chat_id = chat_id
+                    st.rerun()
         else:
-            st.caption("No conversations yet.")
+            st.caption("No conversations yet. Start a new chat to begin.")
+        
+        st.markdown("---")
+        st.markdown("### About")
+        st.markdown("""
+        This assistant provides expert answers about:
+        - Zoning districts and regulations
+        - Permitted uses and bulk requirements
+        - Zoning procedures and compliance
+        - Flood zones and design requirements
+        - City planning policies
+        """)
+        
+        st.markdown("---")
+        st.markdown("### Quick Tips")
+        st.markdown("""
+        - Ask specific questions for best results
+        - Use **address:** prefix for location lookups
+        - Examples:
+          - "What is a C1 zone?"
+          - "address: 123 Main St, Manhattan"
+          - "What are the bulk regulations for R6?"
+        """)
 
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# ---------- Main chat area ----------
+# Main chat area
 with main_col:
-    st.markdown('<div class="chat-main">', unsafe_allow_html=True)
-
     current_chat = st.session_state.chats.get(st.session_state.current_chat_id, [])
-
-    st.markdown('<div class="chat-scroll">', unsafe_allow_html=True)
+    
+    # Display chat messages
     if current_chat:
         for msg in current_chat:
             role = msg.get("role", "assistant")
@@ -255,27 +149,19 @@ with main_col:
             with st.chat_message(role):
                 st.markdown(content)
     else:
-        st.markdown(
-            """
-            <div class="empty-state">
-                <h3>Start a conversation</h3>
-                <p>Ask questions about NYC zoning regulations, districts and land use.</p>
-                <ul>
-                    <li>What are the zoning districts in Manhattan?</li>
-                    <li>Explain the regulations for an R6 district.</li>
-                    <li>What uses are allowed in a C1 commercial district?</li>
-                </ul>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Chat input (bottom, ChatGPT style)
-    prompt = st.chat_input("Type your question about NYC zoning…")
-
+        st.info("Start a conversation by asking a question about NYC zoning regulations.")
+        st.markdown("""
+        **Example questions:**
+        - What are the zoning districts in Manhattan?
+        - Explain the regulations for an R6 district.
+        - What uses are allowed in a C1 commercial district?
+        """)
+    
+    # Chat input
+    prompt = st.chat_input("Type your question about NYC zoning...")
+    
     if prompt:
-        # store + show user message
+        # Store and show user message
         user_msg = {
             "role": "user",
             "content": prompt,
@@ -283,13 +169,13 @@ with main_col:
         }
         current_chat.append(user_msg)
         st.session_state.chats[st.session_state.current_chat_id] = current_chat
-
+        
         with st.chat_message("user"):
             st.markdown(prompt)
-
-        # assistant response
+        
+        # Assistant response
         with st.chat_message("assistant"):
-            with st.spinner("Thinking…"):
+            with st.spinner("Thinking..."):
                 try:
                     answer = get_answer(prompt)
                 except Exception as e:
@@ -299,7 +185,7 @@ with main_col:
                         f"Details: {e}"
                     )
                 st.markdown(answer)
-
+        
         assistant_msg = {
             "role": "assistant",
             "content": answer,
@@ -307,3 +193,4 @@ with main_col:
         }
         current_chat.append(assistant_msg)
         st.session_state.chats[st.session_state.current_chat_id] = current_chat
+        st.rerun()

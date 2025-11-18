@@ -77,6 +77,7 @@ def get_answer(question: str) -> str:
     # 2) Otherwise: fall back to your existing PDF+Groq RAG logic
     index = load_my_index()
 
+    # Use TOP_K chunks, but we can reduce if needed for very large documents
     retriever = index.as_retriever(similarity_top_k=TOP_K)
     nodes = retriever.retrieve(question)
 
@@ -94,6 +95,13 @@ def get_answer(question: str) -> str:
 
     context = "\n\n".join(context_parts)
 
+    # Truncate context if it's too long (keep ~25000 chars to stay within 32k token limit)
+    # Mixtral has 32k context, but we need room for system prompt and response
+    MAX_CONTEXT_LENGTH = 25000
+    if len(context) > MAX_CONTEXT_LENGTH:
+        # Keep the beginning (often has important definitions) and end (often has relevant details)
+        half_max = MAX_CONTEXT_LENGTH // 2
+        context = context[:half_max] + "\n\n[... content truncated for length ...]\n\n" + context[-half_max:]
 
     # 🔹 Compose the prompt for the model
     user_prompt = (
@@ -130,10 +138,10 @@ def get_answer(question: str) -> str:
     "Provide a comprehensive, accurate answer that directly addresses the user's question using the reference material above."
     )
 
-
     # 🔹 Call Groq using OpenAI-compatible chat endpoint
+    # Using mixtral-8x7b-32768 for large context window (32k tokens, free on Groq)
     response = client.chat.completions.create(
-    model="llama-3.1-8b-instant",
+    model="mixtral-8x7b-32768",
     messages=[
         {
             "role": "system",
@@ -158,6 +166,7 @@ def get_answer(question: str) -> str:
         },
     ],
     temperature=0.2,
+    max_tokens=2048,  # Limit response length to save tokens
     )
 
 
