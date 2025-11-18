@@ -26,12 +26,40 @@ def last_message_timestamp(messages):
     return normalize_timestamp(ts)
 
 
-# Page configuration
+# Page configuration - responsive
 st.set_page_config(
     page_title="NYC Zoning Assistant",
     page_icon=None,
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# Add responsive CSS
+st.markdown("""
+    <style>
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .main-header {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .header-buttons {
+            width: 100%;
+            justify-content: space-between;
+        }
+    }
+    
+    /* Fix button styling */
+    .stButton > button {
+        white-space: nowrap;
+    }
+    
+    /* Ensure proper spacing */
+    .main-content {
+        padding: 1rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Initialize session state
 if "chats" not in st.session_state:
@@ -46,19 +74,62 @@ if "chat_counter" not in st.session_state:
 if "sidebar_visible" not in st.session_state:
     st.session_state.sidebar_visible = True
 
-# Header with toggle button
-col1, col2, col3 = st.columns([1, 8, 1])
+if "placeholder_index" not in st.session_state:
+    st.session_state.placeholder_index = 0
+if "rerun_count" not in st.session_state:
+    st.session_state.rerun_count = 0
 
-with col1:
-    if st.button("Toggle Sidebar", key="toggle_sidebar"):
+# Example questions for dynamic placeholder
+example_questions = [
+    "What is a C1 zone?",
+    "What are the bulk regulations for R6?",
+    "What uses are allowed in commercial districts?",
+    "Explain the regulations for an R6 district.",
+    "What are the zoning districts in Manhattan?",
+]
+
+# Increment rerun count and rotate placeholder every 5 reruns (when no input)
+st.session_state.rerun_count += 1
+if st.session_state.rerun_count % 5 == 0:
+    st.session_state.placeholder_index = (st.session_state.placeholder_index + 1) % len(example_questions)
+
+# Get current placeholder
+current_placeholder = example_questions[st.session_state.placeholder_index % len(example_questions)]
+
+# Header with toggle button and new chat
+header_col1, header_col2, header_col3 = st.columns([1, 10, 1])
+
+with header_col1:
+    if st.button(">>", key="toggle_sidebar", help="Toggle sidebar"):
         st.session_state.sidebar_visible = not st.session_state.sidebar_visible
         st.rerun()
 
-with col2:
+with header_col2:
     st.title("NYC Zoning Assistant")
+    
+    # About and Quick Tips below title
+    with st.expander("About", expanded=False):
+        st.markdown("""
+        This assistant provides expert answers about:
+        - Zoning districts and regulations
+        - Permitted uses and bulk requirements
+        - Zoning procedures and compliance
+        - Flood zones and design requirements
+        - City planning policies
+        """)
+    
+    with st.expander("Quick Tips", expanded=False):
+        st.markdown("""
+        - Ask specific questions for best results
+        - Use **address:** prefix for location lookups
+        - Examples:
+          - "What is a C1 zone?"
+          - "address: 123 Main St, Manhattan"
+          - "What are the bulk regulations for R6?"
+        """)
 
-with col3:
-    if st.button("New Chat", key="new_chat_btn"):
+with header_col3:
+    if st.button("+", key="new_chat_btn", help="New Chat"):
         st.session_state.chat_counter += 1
         new_id = f"chat_{st.session_state.chat_counter}"
         st.session_state.chats[new_id] = []
@@ -72,9 +143,9 @@ if st.session_state.current_chat_id is None:
     st.session_state.chats[first_id] = []
     st.session_state.current_chat_id = first_id
 
-# Layout: Sidebar and main area
+# Layout: Sidebar and main area (responsive)
 if st.session_state.sidebar_visible:
-    sidebar_col, main_col = st.columns([3, 9])
+    sidebar_col, main_col = st.columns([2, 8])
 else:
     main_col = st.container()
     sidebar_col = None
@@ -85,57 +156,35 @@ if sidebar_col is not None:
         st.header("Conversations")
         
         chats = st.session_state.chats
-        if chats:
+        # Filter out empty chats (only show chats with messages)
+        chats_with_messages = {k: v for k, v in chats.items() if v}
+        
+        if chats_with_messages:
             sorted_chats = sorted(
-                chats.items(),
+                chats_with_messages.items(),
                 key=lambda x: last_message_timestamp(x[1]),
                 reverse=True,
             )
             
             for chat_id, messages in sorted_chats:
-                if messages:
-                    first_user = next((m for m in messages if m.get("role") == "user"), None)
-                    if first_user:
-                        title_text = first_user["content"]
-                    else:
-                        title_text = "Untitled"
-                    if len(title_text) > 50:
-                        title = title_text[:50] + "..."
-                    else:
-                        title = title_text
+                first_user = next((m for m in messages if m.get("role") == "user"), None)
+                if first_user:
+                    title_text = first_user["content"]
                 else:
-                    title = "New conversation"
+                    title_text = "Untitled"
+                
+                if len(title_text) > 40:
+                    title = title_text[:40] + "..."
+                else:
+                    title = title_text
                 
                 is_active = chat_id == st.session_state.current_chat_id
-                button_label = title
                 
-                if st.button(button_label, key=f"chat_{chat_id}", use_container_width=True):
+                if st.button(title, key=f"chat_{chat_id}", use_container_width=True):
                     st.session_state.current_chat_id = chat_id
                     st.rerun()
         else:
-            st.caption("No conversations yet. Start a new chat to begin.")
-        
-        st.markdown("---")
-        st.markdown("### About")
-        st.markdown("""
-        This assistant provides expert answers about:
-        - Zoning districts and regulations
-        - Permitted uses and bulk requirements
-        - Zoning procedures and compliance
-        - Flood zones and design requirements
-        - City planning policies
-        """)
-        
-        st.markdown("---")
-        st.markdown("### Quick Tips")
-        st.markdown("""
-        - Ask specific questions for best results
-        - Use **address:** prefix for location lookups
-        - Examples:
-          - "What is a C1 zone?"
-          - "address: 123 Main St, Manhattan"
-          - "What are the bulk regulations for R6?"
-        """)
+            st.caption("No conversations yet. Click + to start a new chat.")
 
 # Main chat area
 with main_col:
@@ -148,19 +197,13 @@ with main_col:
             content = msg.get("content", "")
             with st.chat_message(role):
                 st.markdown(content)
-    else:
-        st.info("Start a conversation by asking a question about NYC zoning regulations.")
-        st.markdown("""
-        **Example questions:**
-        - What are the zoning districts in Manhattan?
-        - Explain the regulations for an R6 district.
-        - What uses are allowed in a C1 commercial district?
-        """)
     
-    # Chat input
-    prompt = st.chat_input("Type your question about NYC zoning...")
+    # Chat input with dynamic placeholder
+    prompt = st.chat_input(current_placeholder)
     
     if prompt:
+        # Reset rerun count when user inputs something
+        st.session_state.rerun_count = 0
         # Store and show user message
         user_msg = {
             "role": "user",
