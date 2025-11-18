@@ -97,12 +97,15 @@
 # query.py
 import os
 import sys
+import requests
+
 from llama_index.core import StorageContext, load_index_from_storage, Settings
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from config import INDEX_DIR, EMBED_MODEL_NAME, TOP_K
 
 from openai import OpenAI
 
+from geo_api import lookup_zoning_for_address
 
 # ---- SETUP ----
 
@@ -129,6 +132,33 @@ def load_my_index():
 
 
 def get_answer(question: str) -> str:
+    # 1) Optional: simple routing – if user starts with "address:"
+    if question.lower().startswith("address:"):
+        address = question.split(":", 1)[1].strip()
+        data = lookup_zoning_for_address(address)
+        if not data:
+            return "I tried to look up that address but couldn't get zoning information from the NYC API."
+
+        # format a human answer from the JSON
+        # You must adapt these keys based on the actual API response schema
+        zoning = data.get("zoning_district") or data.get("primary_zoning")
+        overlay = data.get("commercial_overlay")
+        borough = data.get("borough")
+
+        parts = []
+        if zoning:
+            parts.append(f"The primary zoning district for this property is **{zoning}**.")
+        if overlay:
+            parts.append(f"It also has a commercial overlay: **{overlay}**.")
+        if borough:
+            parts.append(f"The property is located in **{borough}**.")
+
+        if not parts:
+            return "The NYC API responded, but it didn't include clear zoning fields I recognize."
+
+        return " ".join(parts)
+
+    # 2) Otherwise: fall back to your existing PDF+Groq RAG logic
     index = load_my_index()
 
     retriever = index.as_retriever(similarity_top_k=TOP_K)
