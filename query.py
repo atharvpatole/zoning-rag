@@ -13,10 +13,22 @@ from geo_api import lookup_zoning_for_address
 
 # ---- SETUP ----
 
+# Try to load from .env file if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed, skip
+
 # Groq API key from environment
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
-    raise RuntimeError("GROQ_API_KEY is not set in environment variables.")
+    raise RuntimeError(
+        "GROQ_API_KEY is not set in environment variables.\n"
+        "Please set it either:\n"
+        "1. As an environment variable: $env:GROQ_API_KEY='your-key' (PowerShell)\n"
+        "2. Or create a .env file with: GROQ_API_KEY=your-key"
+    )
 
 # Configure OpenAI client to talk to Groq
 client = OpenAI(
