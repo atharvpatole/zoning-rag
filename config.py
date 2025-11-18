@@ -1,20 +1,7 @@
-# # config.py
-# from pathlib import Path
-
-# PDF_PATH = Path("zoning-handbook-2018.pdf")  # or Path("data/zoning-handbook-2018.pdf")
-# DB_DIR = Path("store")
-# EMBED_MODEL = "all-MiniLM-L6-v2"   # fast & cheap; swap if you prefer
-# LLM_MODEL = "gpt-4o-mini"                # any modern chat model works
-# # LLM_MODEL = "phi3:mini"
-# CHUNK_SIZE = 1200
-# CHUNK_OVERLAP = 150
-# TOP_K = 4
-
-
 # config.py
 
 # where your PDF lives
-PDF_DIR = "C:/Users/athar/OneDrive/Desktop/raw"
+PDF_DIR = "data_files"
 
 # where LlamaIndex will store the index
 INDEX_DIR = "index_store"

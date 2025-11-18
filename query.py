@@ -1,99 +1,3 @@
-# # # query.py — 100% FREE RAG QA
-# # from config import DB_DIR, EMBED_MODEL, LLM_MODEL, TOP_K
-# # from langchain_community.vectorstores import FAISS
-# # from langchain_community.embeddings import HuggingFaceEmbeddings
-# # from langchain_ollama import ChatOllama
-# # from query import get_chain
-
-# # # from langchain.schema import HumanMessage
-# # from langchain_core.messages import HumanMessage
-
-
-# # DB_DIR = "store"
-# # MODEL = "llama3.2"  # free local model
-
-# # def load_retriever():
-# #     embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-# #     db = FAISS.load_local(DB_DIR, embeddings, allow_dangerous_deserialization=True)
-# #     return db.as_retriever(search_type="similarity", search_kwargs={"k": TOP_K})
-
-# # def answer(query):
-# #     retriever = load_retriever()
-# #     context_docs = retriever.get_relevant_documents(query)
-# #     context = "\n\n".join([d.page_content for d in context_docs])
-
-# #     llm = ChatOllama(model=MODEL)
-
-# #     messages = [
-# #         HumanMessage(content=f"Use the context below to answer the question.\n\nCONTEXT:\n{context}\n\nQUESTION:\n{query}")
-# #     ]
-
-# #     response = llm(messages)
-# #     print("\nAnswer:\n", response.content)
-
-# # if __name__ == "__main__":
-# #     import sys
-# #     question = " ".join(sys.argv[1:])
-# #     answer(question)
-
-# # query.py
-# from langchain_community.vectorstores import FAISS
-# from langchain_community.embeddings import HuggingFaceEmbeddings
-# # from langchain_ollama import ChatOllama
-# from langchain_openai import ChatOpenAI
-# from langchain_core.messages import HumanMessage
-
-# from config import DB_DIR, EMBED_MODEL, LLM_MODEL, TOP_K
-
-
-# def load_retriever():
-#     """Load FAISS store + build retriever."""
-#     embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-#     db = FAISS.load_local(DB_DIR, embeddings, allow_dangerous_deserialization=True)
-#     return db.as_retriever(search_type="similarity", search_kwargs={"k": TOP_K})
-
-
-# def get_answer(question: str) -> str:
-#     """Retrieve context and ask the local LLM."""
-#     retriever = load_retriever()
-#     docs = retriever.invoke(question)
-
-#     # Create clean context
-#     context_parts = []
-#     for d in docs:
-#         page = d.metadata.get("page")
-#         if isinstance(page, int):
-#             page_tag = f"[page {page + 1}] "
-#         else:
-#             page_tag = ""
-#         context_parts.append(page_tag + d.page_content.strip())
-
-#     context = "\n\n".join(context_parts)
-
-#     #llm = ChatOllama(model=LLM_MODEL)
-#     llm = ChatOpenAI(model=LLM_MODEL)
-
-#     prompt = (
-#         "You are an assistant answering questions about the NYC Zoning Handbook (2018).\n"
-#         "Use ONLY the context provided. If the answer is not clearly in the context, say "
-#         "'I don't know based on the handbook context.'\n\n"
-#         f"CONTEXT:\n{context}\n\n"
-#         f"QUESTION: {question}\n\n"
-#         "Answer clearly and concisely:"
-#     )
-
-#     msg = HumanMessage(content=prompt)
-#     response = llm.invoke([msg])
-#     return response.content
-
-
-# # Optional CLI usage: python query.py "your question"
-# if __name__ == "__main__":
-#     import sys
-#     question = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "Explain zoning districts."
-#     print(get_answer(question))
-
-# query.py
 # query.py
 import os
 import sys
@@ -181,24 +85,37 @@ def get_answer(question: str) -> str:
 
     # 🔹 Compose the prompt for the model
     user_prompt = (
-    "You are an assistant that answers questions about NYC zoning and land use.\n"
-    "You have access to internal reference material from several official zoning documents. "
-    "Use this material to answer the question, but DO NOT mention the words 'context', "
-    "'documents', 'PDF', 'pages', or 'examples'.\n\n"
-    "Answer as if you are a knowledgeable zoning expert talking directly to the user.\n"
-    "Guidelines for your answer:\n"
-    "- Give a clear, direct answer in plain language.\n"
-    "- Do NOT say things like 'according to the provided context' or 'in the documents above'.\n"
-    "- Do NOT mention page numbers or file names.\n"
-    "- If the information you have is incomplete or the question is too broad "
-    "  (for example: 'where can I build commercial buildings' for the whole city), "
-    "  say that more detail is needed and ask the user a clarifying question.\n"
-    "- If the reference material truly does not contain the answer, say: "
-    "  'I don’t have enough information from the zoning material to answer that specifically.'\n\n"
-    "INTERNAL REFERENCE MATERIAL (do not refer to this explicitly in your answer):\n"
+    "You are an expert NYC zoning and land use assistant with access to comprehensive official documentation including:\n"
+    "- The complete NYC Zoning Resolution (all articles and regulations)\n"
+    "- Official zoning glossary and definitions\n"
+    "- Zoning FAQ and common questions\n"
+    "- Zoning Handbook with practical guidance\n"
+    "- Flood zone and design planning information\n"
+    "- City planning reports and updates\n\n"
+    "Your task is to provide accurate, authoritative answers based solely on this reference material.\n\n"
+    "Answer Guidelines:\n"
+    "- Answer as a knowledgeable zoning expert speaking directly to the user in clear, professional language.\n"
+    "- Synthesize information from multiple sources when relevant to give a complete answer.\n"
+    "- For definitions: provide the exact definition from the glossary or zoning resolution.\n"
+    "- For regulations: cite specific requirements, limitations, or allowances clearly.\n"
+    "- For zone-specific questions: provide details about permitted uses, bulk regulations, and special requirements.\n"
+    "- For procedural questions: explain steps, requirements, and processes based on the handbook.\n"
+    "- For flood zone questions: reference specific flood zone designations and requirements.\n"
+    "- If information conflicts between sources, prioritize the most recent or most authoritative source.\n"
+    "- If the question requires specific address/location details you don't have, ask for clarification.\n"
+    "- If the question is too broad (e.g., 'all commercial zones in NYC'), explain that zoning varies by location "
+    "  and ask for a specific address or neighborhood.\n"
+    "- If the reference material doesn't contain the answer, state: "
+    "'I don't have sufficient information in the zoning documentation to answer that specifically.'\n\n"
+    "CRITICAL: DO NOT mention:\n"
+    "- 'context', 'documents', 'PDF', 'pages', 'sources', 'materials', 'references'\n"
+    "- Page numbers, file names, or document titles\n"
+    "- Phrases like 'according to the provided context' or 'based on the documents above'\n"
+    "- Instead, speak as if you have direct knowledge of NYC zoning regulations.\n\n"
+    "REFERENCE MATERIAL (use this to formulate your answer, but do not reference it explicitly):\n"
     f"{context}\n\n"
     f"USER QUESTION: {question}\n\n"
-    "Now respond with a helpful, concise answer for the user, following the guidelines above."
+    "Provide a comprehensive, accurate answer that directly addresses the user's question using the reference material above."
     )
 
 
@@ -209,11 +126,18 @@ def get_answer(question: str) -> str:
         {
             "role": "system",
             "content": (
-                "You are a helpful NYC zoning assistant. "
-                "You answer like a zoning expert, in clear language, without mentioning any PDFs, "
-                "documents, pages, or internal context. "
-                "If the question is too broad or the zoning rules vary a lot, "
-                "you ask the user politely for more specific details."
+                "You are an expert NYC zoning and land use consultant with deep knowledge of:\n"
+                "- NYC Zoning Resolution (all articles, districts, and regulations)\n"
+                "- Zoning terminology, definitions, and classifications\n"
+                "- Permitted uses, bulk regulations, and special requirements by zone\n"
+                "- Zoning procedures, applications, and compliance requirements\n"
+                "- Flood zone designations and building requirements\n"
+                "- City planning policies and updates\n\n"
+                "Your responses are authoritative, precise, and based on official NYC zoning regulations. "
+                "You speak directly to users as a knowledgeable expert, never mentioning documents, pages, "
+                "or sources. You synthesize information from multiple zoning documents when needed to provide "
+                "complete answers. For questions requiring specific locations, you ask for addresses or neighborhoods. "
+                "For overly broad questions, you explain the need for specificity and guide users to ask more targeted questions."
             ),
         },
         {
