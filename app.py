@@ -3,12 +3,11 @@ import random
 import streamlit as st
 
 # --- LlamaIndex imports with backwards compatibility ---
-
 try:
-    # Old-style imports (if available)
+    # Older versions
     from llama_index import GPTVectorStoreIndex, SimpleDirectoryReader
 except ImportError:
-    # New-style imports (llama_index >= 0.10+)
+    # Newer versions (0.10+)
     from llama_index.core import VectorStoreIndex as GPTVectorStoreIndex
     from llama_index.core import SimpleDirectoryReader
 
@@ -27,7 +26,6 @@ st.set_page_config(
 DATA_DIR = "data_files"
 
 # ---------- Cached loaders so we don't rebuild index every rerun ----------
-
 @st.cache_resource(show_spinner="Indexing zoning PDFs…")
 def load_index():
     documents = SimpleDirectoryReader(DATA_DIR).load_data()
@@ -45,7 +43,6 @@ def get_query_engine():
 query_engine = get_query_engine()
 
 # ---------- Session state for chat history and sidebar toggle ----------
-
 if "messages" not in st.session_state:
     st.session_state.messages = []            # current conversation messages
 if "conversations" not in st.session_state:
@@ -53,8 +50,7 @@ if "conversations" not in st.session_state:
 if "show_history" not in st.session_state:
     st.session_state.show_history = False     # sidebar (history) visibility
 
-# ---------- Header with logo and buttons ----------
-
+# ---------- Header (no logo, just title + buttons) ----------
 header_col1, header_col2, header_col3 = st.columns([0.7, 6, 0.7])
 
 with header_col1:
@@ -63,8 +59,7 @@ with header_col1:
         st.session_state.show_history = not st.session_state.show_history
 
 with header_col2:
-    # Centered app logo (note: use / not \ for cross-platform paths)
-    st.image(f"{DATA_DIR}/marauders.jpeg", use_column_width=True)
+    st.markdown("<h2 style='text-align:center'>NYC Zoning AI Assistant</h2>", unsafe_allow_html=True)
 
 with header_col3:
     # New chat button (＋)
@@ -76,7 +71,6 @@ with header_col3:
         st.experimental_rerun()
 
 # ---------- Expanders for Quick Tips, About, and Data sources ----------
-
 with st.expander("Quick Tips", expanded=False):
     st.markdown(
         "- **Be specific:** Include details like location, zoning district, or relevant section numbers for more precise answers.\n"
@@ -103,13 +97,10 @@ with st.expander("Which Data Is Used?", expanded=False):
         "- **zoning-handbook-2018.pdf** – *NYC Zoning Handbook (2018 Edition)*"
     )
 
-# ---------- Main chat interface layout ----------
-
+# ---------- Main layout: sidebar history + chat ----------
 if st.session_state.show_history:
-    # If sidebar is toggled on, create two columns (sidebar for history, main for chat)
     sidebar_col, chat_col = st.columns([1.5, 5])
 else:
-    # If sidebar is off, use a single full-width column for chat
     chat_col = st.container()
     sidebar_col = None
 
@@ -129,7 +120,6 @@ if sidebar_col:
                 title = first_user_msg.strip()[:40]
                 if len(first_user_msg) > 40:
                     title += "…"
-                # Button to load that conversation
                 if st.button(title, key=f"conv_{i}"):
                     # Save current convo if not empty
                     if st.session_state.messages:
@@ -138,30 +128,28 @@ if sidebar_col:
                         )
                     # Load the selected convo into current messages
                     st.session_state.messages = conv.copy()
-                    # Remove it from saved list (to avoid duplicates)
                     st.session_state.conversations.pop(i)
                     st.experimental_rerun()
         else:
             st.write("*(No previous chats)*")
 
-# ---------- Chat column: display conversation and input ----------
-
+# ---------- Chat column: messages + input with Ask button ----------
 with chat_col:
-    # Display all past messages in the current conversation
+    # Display existing messages using chat "pills"
     for msg in st.session_state.messages:
         role = msg.get("role", "")
         content = msg.get("content", "")
         if role == "user":
             with st.chat_message("user"):
-                st.markdown(content)
+                st.write(content)
         elif role == "assistant":
             with st.chat_message("assistant"):
-                st.markdown(content)
+                st.write(content)
         else:
             with st.chat_message(role):
-                st.markdown(content)
+                st.write(content)
 
-    # Prepare rotating placeholder from example questions
+    # Rotating example questions for placeholder
     example_questions = [
         "What is the NYC Zoning Resolution?",
         "What does 'as-of-right development' mean in NYC zoning?",
@@ -171,22 +159,38 @@ with chat_col:
     ]
     placeholder_text = random.choice(example_questions)
 
-    # Chat input box (appears at the bottom of the chat interface)
-    user_input = st.chat_input(placeholder=placeholder_text)
-    if user_input:
-        # Store and show user message
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
+    st.markdown("---")
 
-        # Generate answer using the LlamaIndex query engine and Groq LLM
+    # Input + Ask button (no chat_input)
+    input_col, button_col = st.columns([8, 1])
+
+    with input_col:
+        user_text = st.text_input(
+            "Ask a question about NYC zoning",
+            key="user_input_text",
+            placeholder=placeholder_text,
+            label_visibility="collapsed",
+        )
+
+    with button_col:
+        ask_clicked = st.button("Ask", key="ask_button")
+
+    if ask_clicked and user_text.strip():
+        # Show user message
+        st.session_state.messages.append({"role": "user", "content": user_text})
+        with st.chat_message("user"):
+            st.write(user_text)
+
+        # Call the query engine
         try:
-            response = query_engine.query(user_input)
+            response = query_engine.query(user_text)
             answer_text = str(response)
         except Exception as e:
             answer_text = f"*(Error retrieving answer: {e})*"
 
-        # Store and show assistant message
-        st.session_state.messages.append({"role": "assistant", "content": answer_text})
+        # Show assistant message
+        st.session_state.messages.append(
+            {"role": "assistant", "content": answer_text}
+        )
         with st.chat_message("assistant"):
-            st.markdown(answer_text)
+            st.write(answer_text)
